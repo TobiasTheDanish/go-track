@@ -1,17 +1,51 @@
 package web
 
-templ HelloForm() {
+import (
+	"go-track/internal/model"
+	"strconv"
+)
+
+templ ProjectPage(proj model.Project) {
 	@Base() {
-		<form hx-post="/hello" method="POST" hx-target="#hello-container">
-			<input class="bg-gray-200 text-black p-2 border border-gray-400 rounded-lg"id="name" name="name" type="text"/>
-			<button type="submit" class="bg-orange-500 hover:bg-orange-700 text-white py-2 px-4 rounded">Submit</button>
-		</form>
-		<div id="hello-container"></div>
+		<div class="flex flex-col gap-2 h-full pb-1 p-4">
+			<div class="h-1/6">
+				<h1 class="text-3xl font-bold tracking-tight">{ proj.Name }</h1>
+			</div>
+			<div class="flex gap-2 h-5/6 w-full overflow-x-scroll">
+				for _, col := range proj.Columns {
+					@ProjectColumn(col)
+				}
+			</div>
+		</div>
 	}
 }
 
-templ HelloPost(name string) {
-	<div class="bg-green-100 p-4 shadow-md rounded-lg mt-6">
-		<p>Hello, { name }</p>
+templ ProjectColumn(col model.Column) {
+	<div id={ "column-" + strconv.Itoa(col.Id) } class="flex flex-col border border-gray-400 rounded-lg h-full">
+		<div class="w-full p-2 border-b border-gray-400">
+			<h1>{ col.Name }</h1>
+		</div>
+		<div id={ col.Name + "-item-container" } class="flex flex-col gap-2 flex-1 p-2">
+			for _, item := range col.Items {
+				@ProjectItem(item)
+			}
+		</div>
+		<form hx-post={ "/columns/items" } method="POST" hx-target={ "#" + col.Name + "-item-container" } hx-swap="beforeend" class="flex">
+			<input type="hidden" name="column" value={ strconv.Itoa(col.Id) }/>
+			<input class="bg-gray-200 text-black p-2 border border-gray-400 rounded-lg" name="name" type="text"/>
+		</form>
 	</div>
+}
+
+templ ProjectItem(item model.Item) {
+	<div class="relative bg-gray-200 p-4 border border-gray-400 rounded-lg group">
+		<p>{ item.Name }</p>
+		<div hx-delete={ "/columns/" + strconv.Itoa(item.ColumnID) + "/items/" + strconv.Itoa(item.Id) } hx-target={ "#column-" + strconv.Itoa(item.ColumnID) } hx-swap="outerHTML" class="absolute top-1 right-1 hidden hover:bg-gray-300 border rounded group-hover:block p-1">
+			@CloseIcon()
+		</div>
+	</div>
+}
+
+templ CloseIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
 }

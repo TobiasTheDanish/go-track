@@ -2,6 +2,9 @@ package server
 
 import (
 	"fmt"
+	"go-track/cmd/web"
+	"go-track/internal/db"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -11,13 +14,22 @@ import (
 )
 
 type Server struct {
-	port int
+	port       int
+	webHandler *web.Handler
 }
 
 func NewServer() *http.Server {
+	db, err := db.New()
+	if err != nil {
+		log.Fatalf("%e", err)
+	}
+
+	webHandler := web.NewHandler(db)
+
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 	NewServer := &Server{
-		port: port,
+		port:       port,
+		webHandler: webHandler,
 	}
 
 	// Declare Server config

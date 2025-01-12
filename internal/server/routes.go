@@ -3,7 +3,6 @@ package server
 import (
 	"net/http"
 
-	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go-track/cmd/web"
@@ -16,10 +15,11 @@ func (s *Server) RegisterRoutes() http.Handler {
 	fileServer := http.FileServer(http.FS(web.Files))
 	e.GET("/assets/*", echo.WrapHandler(fileServer))
 
-	e.GET("/web", echo.WrapHandler(templ.Handler(web.HelloForm())))
-	e.POST("/hello", echo.WrapHandler(http.HandlerFunc(web.HelloWebHandler)))
+	e.GET("/:id", s.webHandler.ProjectPageHandler)
+	e.POST("/columns/items", echo.WrapHandler(http.HandlerFunc(web.ProjectItemHandler)))
+	e.DELETE("/columns/:colID/items/:itemID", web.DeleteProjectItemHandler)
 
-	e.GET("/", s.HelloWorldHandler)
+	e.GET("/api", s.HelloWorldHandler)
 
 	return e
 }
