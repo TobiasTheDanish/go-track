@@ -7,13 +7,15 @@ type Project struct {
 }
 
 type Column struct {
-	Id    int
-	Name  string
-	Items []Item
+	Id        int
+	Name      string
+	ProjectID int
+	Items     []Item
 }
 
 type Item struct {
-	Id       int
-	Name     string
-	ColumnID int
+	Id          int
+	Name        string
+	ColumnID    int
+	ColumnOrder int
 }

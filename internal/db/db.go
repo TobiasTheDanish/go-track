@@ -13,7 +13,14 @@ import (
 
 type DatabaseFacade interface {
 	GetProject(id int) (model.Project, error)
+	GetColumnsForProject(projectID int) ([]model.Column, error)
+	GetColumn(id int) (model.Column, error)
 	AddItemToColumn(name string, columnID int) (model.Item, error)
+	GetNextItemColumnOrder(columnID int) (int, error)
+
+	GetItem(id int) (model.Item, error)
+	UpdateItem(id int, item model.Item) (model.Item, error)
+	DeleteItem(itemID int) error
 }
 
 type database struct {
@@ -55,10 +62,10 @@ func (db *database) GetProject(id int) (model.Project, error) {
 }
 
 func (db *database) GetColumn(id int) (model.Column, error) {
-	row := db.db.QueryRow("SELECT id, name FROM `gt_project_column` WHERE id=?", id)
+	row := db.db.QueryRow("SELECT id, name, project_id FROM `gt_project_column` WHERE id=?", id)
 
 	var col model.Column
-	if err := row.Scan(&col.Id, &col.Name); err != nil {
+	if err := row.Scan(&col.Id, &col.Name, &col.ProjectID); err != nil {
 		return model.Column{}, err
 	}
 
@@ -72,7 +79,7 @@ func (db *database) GetColumn(id int) (model.Column, error) {
 }
 
 func (db *database) GetColumnsForProject(projectID int) ([]model.Column, error) {
-	rows, err := db.db.Query("SELECT id, name FROM `gt_project_column` WHERE project_id=?", projectID)
+	rows, err := db.db.Query("SELECT id, name, project_id FROM `gt_project_column` WHERE project_id=?", projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +90,8 @@ func (db *database) GetColumnsForProject(projectID int) ([]model.Column, error) 
 	for rows.Next() {
 		var id int
 		var name string
-		if err := rows.Scan(&id, &name); err != nil {
+		var projectID int
+		if err := rows.Scan(&id, &name, &projectID); err != nil {
 			return nil, err
 		}
 		items, err := db.GetItemsForColumn(id)
@@ -92,9 +100,10 @@ func (db *database) GetColumnsForProject(projectID int) ([]model.Column, error) 
 		}
 
 		cols = append(cols, model.Column{
-			Id:    id,
-			Name:  name,
-			Items: items,
+			Id:        id,
+			Name:      name,
+			ProjectID: projectID,
+			Items:     items,
 		})
 	}
 
@@ -104,7 +113,7 @@ func (db *database) GetColumnsForProject(projectID int) ([]model.Column, error) 
 }
 
 func (db *database) GetItemsForColumn(columnID int) ([]model.Item, error) {
-	rows, err := db.db.Query("SELECT * FROM `gt_project_column_item` WHERE column_id=?", columnID)
+	rows, err := db.db.Query("SELECT * FROM `gt_project_column_item` WHERE column_id=? ORDER BY column_order", columnID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,24 +122,23 @@ func (db *database) GetItemsForColumn(columnID int) ([]model.Item, error) {
 	items := make([]model.Item, 0)
 
 	for rows.Next() {
-		var id int
-		var name string
-		var columnID int
-		if err := rows.Scan(&id, &name, &columnID); err != nil {
+		var item model.Item
+		if err := rows.Scan(&item.Id, &item.Name, &item.ColumnID, &item.ColumnOrder); err != nil {
 			return nil, err
 		}
-		items = append(items, model.Item{
-			Id:       id,
-			Name:     name,
-			ColumnID: columnID,
-		})
+		items = append(items, item)
 	}
 
 	return items, nil
 }
 
 func (db *database) AddItemToColumn(name string, columnID int) (model.Item, error) {
-	res, err := db.db.Exec("INSERT INTO `gt_project_column_item` (name, columnID) values (?, ?)", name, columnID)
+	colOrder, err := db.GetNextItemColumnOrder(columnID)
+	if err != nil {
+		return model.Item{}, err
+	}
+
+	res, err := db.db.Exec("INSERT INTO `gt_project_column_item` (name, column_id, column_order) values (?, ?, ?)", name, columnID, colOrder)
 	if err != nil {
 		return model.Item{}, err
 	}
@@ -145,4 +153,49 @@ func (db *database) AddItemToColumn(name string, columnID int) (model.Item, erro
 		Name:     name,
 		ColumnID: columnID,
 	}, nil
+}
+
+func (db *database) GetNextItemColumnOrder(columnID int) (int, error) {
+	res := db.db.QueryRow("SELECT column_order FROM `gt_project_column_item` WHERE column_id=? ORDER BY column_order DESC", columnID)
+
+	var colOrder int
+	if err := res.Scan(&colOrder); err != nil {
+		if err == sql.ErrNoRows {
+			return 1, nil
+		}
+		return -1, err
+	}
+
+	return colOrder + 1, nil
+}
+
+func (db *database) GetItem(itemID int) (model.Item, error) {
+	res := db.db.QueryRow("SELECT * FROM `gt_project_column_item` WHERE id=?", itemID)
+
+	var item model.Item
+	if err := res.Scan(&item.Id, &item.Name, &item.ColumnID, &item.ColumnOrder); err != nil {
+		return model.Item{}, err
+	}
+
+	return item, nil
+}
+
+func (db *database) UpdateItem(id int, itemData model.Item) (model.Item, error) {
+	res := db.db.QueryRow("UPDATE `gt_project_column_item` SET name=?, column_id=?, column_order=? WHERE id=? RETURNING *", itemData.Name, itemData.ColumnID, itemData.ColumnOrder, itemData.Id)
+
+	var item model.Item
+	if err := res.Scan(&item.Id, &item.Name, &item.ColumnID, &item.ColumnOrder); err != nil {
+		return model.Item{}, err
+	}
+
+	return item, nil
+}
+
+func (db *database) DeleteItem(itemID int) error {
+	_, err := db.db.Exec("DELETE FROM `gt_project_column_item` WHERE id=?", itemID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -16,8 +16,11 @@ func (s *Server) RegisterRoutes() http.Handler {
 	e.GET("/assets/*", echo.WrapHandler(fileServer))
 
 	e.GET("/:id", s.webHandler.ProjectPageHandler)
-	e.POST("/columns/items", echo.WrapHandler(http.HandlerFunc(web.ProjectItemHandler)))
-	e.DELETE("/columns/:colID/items/:itemID", web.DeleteProjectItemHandler)
+
+	e.POST("/columns/items", s.webHandler.ProjectItemHandler)
+	e.POST("/project/:id/items/:itemID/move", s.webHandler.MoveProjectItemHandler)
+
+	e.DELETE("/columns/:colID/items/:itemID", s.webHandler.DeleteProjectItemHandler)
 
 	e.GET("/api", s.HelloWorldHandler)
 

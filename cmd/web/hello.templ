@@ -11,36 +11,74 @@ templ ProjectPage(proj model.Project) {
 			<div class="h-1/6">
 				<h1 class="text-3xl font-bold tracking-tight">{ proj.Name }</h1>
 			</div>
-			<div class="flex gap-2 h-5/6 w-full overflow-x-scroll">
-				for _, col := range proj.Columns {
-					@ProjectColumn(col)
-				}
-			</div>
+			@ProjectColumns(proj.Columns)
 		</div>
 	}
 }
 
+templ ProjectColumns(cols []model.Column) {
+	<div id="columns-container" class="flex gap-2 h-5/6 w-full overflow-x-scroll">
+		for _, col := range cols {
+			@ProjectColumn(col)
+		}
+	</div>
+}
+
 templ ProjectColumn(col model.Column) {
-	<div id={ "column-" + strconv.Itoa(col.Id) } class="flex flex-col border border-gray-400 rounded-lg h-full">
+	<div id={ "column-" + strconv.Itoa(col.Id) } class="flex flex-col border border-gray-400 rounded-lg w-min h-full">
 		<div class="w-full p-2 border-b border-gray-400">
 			<h1>{ col.Name }</h1>
 		</div>
-		<div id={ col.Name + "-item-container" } class="flex flex-col gap-2 flex-1 p-2">
+		<div id={ col.Name + "-item-container" } class="flex overflow-y-auto flex-col gap-2 flex-1 p-2">
 			for _, item := range col.Items {
-				@ProjectItem(item)
+				@ProjectItem(col.ProjectID, item)
 			}
 		</div>
 		<form hx-post={ "/columns/items" } method="POST" hx-target={ "#" + col.Name + "-item-container" } hx-swap="beforeend" class="flex">
 			<input type="hidden" name="column" value={ strconv.Itoa(col.Id) }/>
-			<input class="bg-gray-200 text-black p-2 border border-gray-400 rounded-lg" name="name" type="text"/>
+			<input class="bg-gray-200 text-black p-2 border-t border-gray-400 rounded-b-lg" name="name" type="text"/>
 		</form>
 	</div>
 }
 
-templ ProjectItem(item model.Item) {
-	<div class="relative bg-gray-200 p-4 border border-gray-400 rounded-lg group">
+templ ProjectItem(projID int, item model.Item) {
+	<div class="relative flex flex-col bg-gray-200 p-4 gap-2 border border-gray-400 rounded-lg group text-pretty">
 		<p>{ item.Name }</p>
-		<div hx-delete={ "/columns/" + strconv.Itoa(item.ColumnID) + "/items/" + strconv.Itoa(item.Id) } hx-target={ "#column-" + strconv.Itoa(item.ColumnID) } hx-swap="outerHTML" class="absolute top-1 right-1 hidden hover:bg-gray-300 border rounded group-hover:block p-1">
+		<div class="w-full flex gap-2 invisible group-hover:visible ">
+			<div
+				hx-post={ "project/" + strconv.Itoa(projID) + "/items/" + strconv.Itoa(item.Id) + "/move?dir=left" }
+				hx-target="#columns-container"
+				hx-swap="outerHTML"
+				class="hover:bg-gray-300 cursor-pointer"
+			>
+				@ArrowLeftIcon()
+			</div>
+			<div
+				hx-post={ "project/" + strconv.Itoa(projID) + "/items/" + strconv.Itoa(item.Id) + "/move?dir=down" }
+				hx-target="#columns-container"
+				hx-swap="outerHTML"
+				class="hover:bg-gray-300 cursor-pointer"
+			>
+				@ArrowDownIcon()
+			</div>
+			<div
+				hx-post={ "project/" + strconv.Itoa(projID) + "/items/" + strconv.Itoa(item.Id) + "/move?dir=up" }
+				hx-target="#columns-container"
+				hx-swap="outerHTML"
+				class="hover:bg-gray-300 cursor-pointer"
+			>
+				@ArrowUpIcon()
+			</div>
+			<div
+				hx-post={ "project/" + strconv.Itoa(projID) + "/items/" + strconv.Itoa(item.Id) + "/move?dir=right" }
+				hx-target="#columns-container"
+				hx-swap="outerHTML"
+				class="hover:bg-gray-300 cursor-pointer"
+			>
+				@ArrowRightIcon()
+			</div>
+		</div>
+		<div hx-delete={ "/columns/" + strconv.Itoa(item.ColumnID) + "/items/" + strconv.Itoa(item.Id) } hx-target={ "#column-" + strconv.Itoa(item.ColumnID) } hx-swap="outerHTML" class="absolute cursor-pointer top-1 right-1 hidden hover:bg-gray-300 border rounded group-hover:block p-1">
 			@CloseIcon()
 		</div>
 	</div>
@@ -48,4 +86,20 @@ templ ProjectItem(item model.Item) {
 
 templ CloseIcon() {
 	<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+}
+
+templ ArrowRightIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+}
+
+templ ArrowLeftIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+}
+
+templ ArrowUpIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg>
+}
+
+templ ArrowDownIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg>
 }
