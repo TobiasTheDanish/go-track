@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go-track/cmd/web"
 	"go-track/internal/db"
+	"go-track/internal/github"
 	"log"
 	"net/http"
 	"os"
@@ -21,10 +22,14 @@ type Server struct {
 func NewServer() *http.Server {
 	db, err := db.New()
 	if err != nil {
-		log.Fatalf("%e", err)
+		log.Fatalf("Creating DatabaseFacade failed! %e", err)
+	}
+	gh, err := github.New()
+	if err != nil {
+		log.Fatalf("Creating GithubService failed! %e", err)
 	}
 
-	webHandler := web.NewHandler(db)
+	webHandler := web.NewHandler(db, gh)
 
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 	NewServer := &Server{

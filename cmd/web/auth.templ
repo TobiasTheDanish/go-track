@@ -1,0 +1,54 @@
+package web
+
+templ SignIn(authUrl templ.SafeURL) {
+	@Base() {
+		<div class="w-max m-auto">
+			@card("") {
+				@cardHeader("") {
+					<h2 class="text-2xl font-semibold tracking-tight">Sign in</h2>
+					<p class="text-sm text-slate-500">
+						Sign in with Github to manage your installations
+					</p>
+				}
+				@cardContent("") {
+					<a href={ authUrl }>
+						<div class="flex gap-2 min-w-[280px] border rounded p-4 justify-center items-center shadow-sm hover:bg-slate-200/25 transition-colors">
+							@githubIcon()
+							<p>
+								Sign in with GitHub
+							</p>
+						</div>
+					</a>
+				}
+			}
+		</div>
+	}
+}
+
+templ card(className string) {
+	<div class={ "flex flex-col border rounded-xl shadow w-fit", className }>
+		{ children... }
+	</div>
+}
+
+templ cardHeader(className string) {
+	<div class={ "p-6 w-full", className }>
+		{ children... }
+	</div>
+}
+
+templ cardContent(className string) {
+	<div class={ "w-full p-6 pt-0", className }>
+		{ children... }
+	</div>
+}
+
+templ cardFooter(className string) {
+	<div class={ "w-full p-6 pt-0", className }>
+		{ children... }
+	</div>
+}
+
+templ githubIcon() {
+	<img src="assets/svg/github-mark.svg" alt="GitHub logo" class="w-[28px]"/>
+}
