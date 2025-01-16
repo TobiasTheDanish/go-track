@@ -1,6 +1,7 @@
 package web
 
 import (
+	view "go-track/cmd/web/view"
 	"go-track/internal/auth"
 	"log"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 func (h *Handler) SignInHandler(c echo.Context) error {
 	authUrl := h.gh.GetAuthUrl()
 
-	return SignIn(templ.SafeURL(authUrl)).Render(c.Request().Context(), c.Response().Writer)
+	return view.SignIn(templ.SafeURL(authUrl)).Render(c.Request().Context(), c.Response().Writer)
 }
 
 func (h *Handler) GithubAuthCallbackHandler(c echo.Context) error {

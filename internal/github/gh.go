@@ -20,6 +20,7 @@ type GithubService interface {
 	GetAuthUrl() string
 	AuthUserByCode(code string) (model.AuthUserRes, error)
 	GetAuthorizedUser(auth model.AuthUserRes) (model.AuthorizedUser, error)
+	CreateIssue(owner string, repo string, title string) (CreateIssueRes, error)
 }
 
 type githubService struct {

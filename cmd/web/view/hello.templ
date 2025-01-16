@@ -5,23 +5,32 @@ import (
 	"strconv"
 )
 
+type ModalState struct {
+	Show            bool
+	Title           string
+	Body            string
+	TargetElementID string
+	Endpoint        string
+}
+
 templ ProjectPage(proj model.Project) {
 	@Base() {
 		<div class="flex flex-col gap-2 h-full pb-1 p-4">
 			<div class="h-1/6">
 				<h1 class="text-3xl font-bold tracking-tight">{ proj.Name }</h1>
 			</div>
-			@ProjectColumns(proj.Columns)
+			@ProjectColumns(proj.Columns, ModalState{Show: true, Title: "Hello world", Body: "Lorem ipsum dolor sit amet, qui minim labore adipisicing minim sint cillum sint consectetur cupidatat."})
 		</div>
 	}
 }
 
-templ ProjectColumns(cols []model.Column) {
+templ ProjectColumns(cols []model.Column, modalState ModalState) {
 	<div id="columns-container" class="flex gap-2 h-5/6 w-full overflow-x-scroll">
 		for _, col := range cols {
 			@ProjectColumn(col)
 		}
 	</div>
+	@Modal(modalState)
 }
 
 templ ProjectColumn(col model.Column) {
@@ -82,6 +91,17 @@ templ ProjectItem(projID int, item model.Item) {
 			@CloseIcon()
 		</div>
 	</div>
+}
+
+templ Modal(state ModalState) {
+	if state.Show {
+		<div class="absolute top-0 left-0 w-screen h-screen backdrop-opacity-75">
+			<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/2 h-1/2 bg-white shadow opacity-100 flex flex-col gap-4 rounded-lg p-4 border-gray-400">
+				<h1 class="text-2xl font-semibold tracking-tight">{ state.Title }</h1>
+				<p class="text-md">{ state.Body }</p>
+			</div>
+		</div>
+	}
 }
 
 templ CloseIcon() {

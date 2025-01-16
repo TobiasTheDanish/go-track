@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"fmt"
+	view "go-track/cmd/web/view"
 	"go-track/internal/model"
 	"log"
 	"net/http"
@@ -25,7 +26,7 @@ func (h *Handler) ProjectPageHandler(c echo.Context) error {
 
 	log.Printf("%s, %v\n", proj.Name, proj.Columns)
 
-	return ProjectPage(proj).Render(c.Request().Context(), c.Response().Writer)
+	return view.ProjectPage(proj).Render(c.Request().Context(), c.Response().Writer)
 }
 
 type moveItemRequest struct {
@@ -49,15 +50,16 @@ func (h *Handler) MoveProjectItemHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
 
+	newColId := -1
 	switch strings.ToLower(dir) {
 	case "left":
-		err = h.moveItemLeft(id, item)
+		newColId, err = h.moveItemLeft(id, item)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
 		break
 	case "right":
-		err = h.moveItemRight(id, item)
+		newColId, err = h.moveItemRight(id, item)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
@@ -76,12 +78,52 @@ func (h *Handler) MoveProjectItemHandler(c echo.Context) error {
 		break
 	}
 
+	log.Printf("New column: %d\n", newColId)
+	if newColId != -1 {
+		err = h.itemEnter(newColId, item)
+		if err != nil {
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
+	}
+
 	cols, err := h.db.GetColumnsForProject(id)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
-	return ProjectColumns(cols).Render(c.Request().Context(), c.Response().Writer)
+	return view.ProjectColumns(cols, view.ModalState{Show: false}).Render(c.Request().Context(), c.Response().Writer)
+}
+
+func (h *Handler) itemEnter(colID int, item model.Item) error {
+	col, err := h.db.GetColumn(colID)
+	if err != nil {
+		return err
+	}
+
+	switch strings.ToLower(col.Name) {
+	case "backlog":
+		break
+	case "todo":
+		// create new issue
+		issue, err := h.gh.CreateIssue("TobiasTheDanish", "go-track", item.Name)
+		if err != nil {
+			return err
+		}
+
+		log.Printf("Issue created: %v\n", issue)
+		break
+	case "in progress":
+		// create branch for issue
+		break
+	case "ready for pull request":
+		// create pr for branch
+		break
+	case "done":
+		// close pr and issue
+		break
+	}
+
+	return nil
 }
 
 func (h *Handler) moveItemDown(item model.Item) error {
@@ -138,10 +180,10 @@ func (h *Handler) moveItemUp(item model.Item) error {
 	return err
 }
 
-func (h *Handler) moveItemRight(projID int, item model.Item) error {
+func (h *Handler) moveItemRight(projID int, item model.Item) (int, error) {
 	proj, err := h.db.GetProject(projID)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	colIndex := len(proj.Columns)
@@ -153,14 +195,14 @@ func (h *Handler) moveItemRight(projID int, item model.Item) error {
 	}
 
 	if colIndex >= len(proj.Columns)+1 {
-		return errors.New("Could not move item right")
+		return -1, errors.New("Could not move item right")
 	}
 
 	newCol := proj.Columns[colIndex+1]
 
 	colOrder, err := h.db.GetNextItemColumnOrder(newCol.Id)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	item.ColumnID = newCol.Id
@@ -168,13 +210,17 @@ func (h *Handler) moveItemRight(projID int, item model.Item) error {
 	log.Printf("new item %v\n", item)
 
 	_, err = h.db.UpdateItem(item.Id, item)
-	return err
+	if err != nil {
+		return -1, err
+	}
+
+	return newCol.Id, nil
 }
 
-func (h *Handler) moveItemLeft(projID int, item model.Item) error {
+func (h *Handler) moveItemLeft(projID int, item model.Item) (int, error) {
 	proj, err := h.db.GetProject(projID)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	colIndex := -1
@@ -186,21 +232,24 @@ func (h *Handler) moveItemLeft(projID int, item model.Item) error {
 	}
 
 	if colIndex <= 0 {
-		return errors.New("Could not move item left")
+		return -1, errors.New("Could not move item left")
 	}
 
 	newCol := proj.Columns[colIndex-1]
 
 	colOrder, err := h.db.GetNextItemColumnOrder(newCol.Id)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	item.ColumnID = newCol.Id
 	item.ColumnOrder = colOrder
 
 	_, err = h.db.UpdateItem(item.Id, item)
-	return err
+	if err != nil {
+		return -1, err
+	}
+	return newCol.Id, err
 }
 
 func (h *Handler) ProjectItemHandler(c echo.Context) error {
@@ -224,7 +273,7 @@ func (h *Handler) ProjectItemHandler(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
-	return ProjectItem(col.ProjectID, item).Render(c.Request().Context(), c.Response().Writer)
+	return view.ProjectItem(col.ProjectID, item).Render(c.Request().Context(), c.Response().Writer)
 }
 
 func (h *Handler) DeleteProjectItemHandler(c echo.Context) error {
@@ -249,5 +298,5 @@ func (h *Handler) DeleteProjectItemHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, fmt.Sprintf("Could not delete item: %s", err.Error()))
 	}
 
-	return ProjectColumn(column).Render(c.Request().Context(), c.Response().Writer)
+	return view.ProjectColumn(column).Render(c.Request().Context(), c.Response().Writer)
 }
