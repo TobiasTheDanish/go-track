@@ -95,11 +95,18 @@ templ ProjectItem(projID int, item model.Item) {
 
 templ Modal(state ModalState) {
 	if state.Show {
-		<div class="absolute top-0 left-0 w-screen h-screen backdrop-opacity-75">
-			<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/2 h-1/2 bg-white shadow opacity-100 flex flex-col gap-4 rounded-lg p-4 border-gray-400">
-				<h1 class="text-2xl font-semibold tracking-tight">{ state.Title }</h1>
-				<p class="text-md">{ state.Body }</p>
+		<div id="modal-container">
+			<div class="absolute top-0 left-0 w-screen h-screen backdrop-opacity-75">
+				<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/2 h-1/2 bg-white shadow opacity-100 flex flex-col gap-4 rounded-lg p-4 border-gray-400">
+					<h1 class="text-2xl font-semibold tracking-tight">{ state.Title }</h1>
+					<p class="text-md flex-1">{ state.Body }</p>
+					<div class="flex gap-4 justify-end">
+						<button id="modal-dismiss-btn" type="button">Dismiss</button>
+						<button type="button">Accept</button>
+					</div>
+				</div>
 			</div>
+			<script src="assets/js/modal.js"></script>
 		</div>
 	}
 }
