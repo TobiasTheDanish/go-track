@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"go-track/internal/model"
-	"log"
 	"os"
 
 	_ "github.com/tursodatabase/libsql-client-go/libsql"
@@ -48,8 +47,6 @@ func (db *database) GetProject(id int) (model.Project, error) {
 	if err := row.Scan(&proj.Id, &proj.Name); err != nil {
 		return model.Project{}, err
 	}
-
-	log.Printf("Project: %v\n", proj)
 
 	cols, err := db.GetColumnsForProject(id)
 	if err != nil {
@@ -107,8 +104,6 @@ func (db *database) GetColumnsForProject(projectID int) ([]model.Column, error) 
 		})
 	}
 
-	log.Printf("Columns for %d: %v\n", projectID, cols)
-
 	return cols, err
 }
 
@@ -123,7 +118,15 @@ func (db *database) GetItemsForColumn(columnID int) ([]model.Item, error) {
 
 	for rows.Next() {
 		var item model.Item
-		if err := rows.Scan(&item.Id, &item.Name, &item.ColumnID, &item.ColumnOrder); err != nil {
+		if err := rows.Scan(
+			&item.Id,
+			&item.Name,
+			&item.ColumnID,
+			&item.ColumnOrder,
+			&item.IssueID,
+			&item.IssueNumber,
+			&item.IssueUrl,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -173,7 +176,15 @@ func (db *database) GetItem(itemID int) (model.Item, error) {
 	res := db.db.QueryRow("SELECT * FROM `gt_project_column_item` WHERE id=?", itemID)
 
 	var item model.Item
-	if err := res.Scan(&item.Id, &item.Name, &item.ColumnID, &item.ColumnOrder); err != nil {
+	if err := res.Scan(
+		&item.Id,
+		&item.Name,
+		&item.ColumnID,
+		&item.ColumnOrder,
+		&item.IssueID,
+		&item.IssueNumber,
+		&item.IssueUrl,
+	); err != nil {
 		return model.Item{}, err
 	}
 
@@ -181,10 +192,18 @@ func (db *database) GetItem(itemID int) (model.Item, error) {
 }
 
 func (db *database) UpdateItem(id int, itemData model.Item) (model.Item, error) {
-	res := db.db.QueryRow("UPDATE `gt_project_column_item` SET name=?, column_id=?, column_order=? WHERE id=? RETURNING *", itemData.Name, itemData.ColumnID, itemData.ColumnOrder, itemData.Id)
+	res := db.db.QueryRow("UPDATE `gt_project_column_item` SET name=?, column_id=?, column_order=?, gh_issue_no=?, gh_issue_id=?, gh_issue_url=? WHERE id=? RETURNING *", itemData.Name, itemData.ColumnID, itemData.ColumnOrder, itemData.IssueNumber, itemData.IssueID, itemData.IssueUrl, itemData.Id)
 
 	var item model.Item
-	if err := res.Scan(&item.Id, &item.Name, &item.ColumnID, &item.ColumnOrder); err != nil {
+	if err := res.Scan(
+		&item.Id,
+		&item.Name,
+		&item.ColumnID,
+		&item.ColumnOrder,
+		&item.IssueID,
+		&item.IssueNumber,
+		&item.IssueUrl,
+	); err != nil {
 		return model.Item{}, err
 	}
 

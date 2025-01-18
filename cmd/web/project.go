@@ -78,8 +78,8 @@ func (h *Handler) MoveProjectItemHandler(c echo.Context) error {
 		break
 	}
 
-	log.Printf("New column: %d\n", newColId)
 	if newColId != -1 {
+		item.ColumnID = newColId
 		err = h.itemEnter(newColId, item)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
@@ -105,12 +105,21 @@ func (h *Handler) itemEnter(colID int, item model.Item) error {
 		break
 	case "todo":
 		// create new issue
-		issue, err := h.gh.CreateIssue("TobiasTheDanish", "go-track", item.Name)
-		if err != nil {
-			return err
-		}
+		if item.IssueID == -1 {
+			issue, err := h.gh.CreateIssue("TobiasTheDanish", "go-track", item.Name)
+			if err != nil {
+				return err
+			}
 
-		log.Printf("Issue created: %v\n", issue)
+			item.IssueID = issue.Id
+			item.IssueNumber = issue.Number
+			item.IssueUrl = issue.HtmlUrl
+
+			_, err = h.db.UpdateItem(item.Id, item)
+			if err != nil {
+				return err
+			}
+		}
 		break
 	case "in progress":
 		// create branch for issue

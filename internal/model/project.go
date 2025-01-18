@@ -18,4 +18,7 @@ type Item struct {
 	Name        string
 	ColumnID    int
 	ColumnOrder int
+	IssueID     int64
+	IssueNumber int
+	IssueUrl    string
 }
