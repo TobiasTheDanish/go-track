@@ -149,13 +149,13 @@ func (gh *githubService) CreateBranch(owner, repo, name, fromSha string) (Branch
 	}
 
 	if res.StatusCode != 201 {
-		return BranchDTO{}, errors.New(fmt.Sprintf("Creating issue for repo: '%s/%s', failed with body: %s", owner, repo, resBody))
+		return BranchDTO{}, errors.New(fmt.Sprintf("Creating branch for repo: '%s/%s', failed with body: %s", owner, repo, resBody))
 	}
 
 	return BranchDTO{
 		Name: name,
 		Commit: struct {
-			Sha string "json:\"sha\""
+			Sha string `json:"sha"`
 		}{
 			Sha: fromSha,
 		},

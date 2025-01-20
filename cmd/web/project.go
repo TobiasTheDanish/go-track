@@ -171,7 +171,32 @@ func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState
 		break
 	case "ready for pull request":
 		// create pr for branch
-		modalState = view.ModalState{Show: false}
+		if item.BranchName != "" {
+			branches, err := h.gh.GetBranches("TobiasTheDanish", "go-track")
+			if err != nil {
+				return view.ModalState{}, err
+			}
+
+			dropdownItems := make([]view.DropdownItem, len(branches), len(branches))
+
+			for i, branch := range branches {
+				dropdownItems[i] = view.DropdownItem{
+					Value: branch.Commit.Sha,
+					Name:  branch.Name,
+				}
+			}
+
+			modalState = view.ModalState{
+				Show:            true,
+				Title:           fmt.Sprintf("Create pull request for branch '%s'", item.BranchName),
+				Body:            view.CreatePRModalBody(item.BranchName, dropdownItems...),
+				Endpoint:        fmt.Sprintf("/project/%d/items/%d/pr", projID, item.Id),
+				TargetElementID: "columns-container",
+			}
+
+		} else {
+			modalState = view.ModalState{Show: false}
+		}
 		break
 	case "done":
 		// close pr and issue
@@ -338,6 +363,16 @@ func (h *Handler) CreateBranchHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
 
+	itemID, err := strconv.Atoi(c.Param("itemID"))
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	item, err := h.db.GetItem(itemID)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
 	name := c.FormValue("branch-name")
 	sha := c.FormValue("branch-sha")
 
@@ -346,7 +381,48 @@ func (h *Handler) CreateBranchHandler(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
-	log.Printf("New branch: %v\n", branch)
+	item.BranchName = branch.Name
+
+	_, err = h.db.UpdateItem(itemID, item)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/%d/columns", id))
+}
+
+func (h *Handler) CreatePRHandler(c echo.Context) error {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	itemID, err := strconv.Atoi(c.Param("itemID"))
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	item, err := h.db.GetItem(itemID)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	head := c.FormValue("head-branch")
+	base := c.FormValue("base-branch")
+
+	pr, err := h.gh.CreatePullRequest("TobiasTheDanish", "go-track", head, base, item.IssueNumber)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+
+	log.Printf("pr: %v\n", pr)
+
+	// item.BranchName = pr.Name
+	//
+	// _, err = h.db.UpdateItem(itemID, item)
+	// if err != nil {
+	// 	return c.String(http.StatusBadRequest, err.Error())
+	// }
 
 	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/%d/columns", id))
 }

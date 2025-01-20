@@ -21,4 +21,5 @@ type Item struct {
 	IssueID     int64
 	IssueNumber int
 	IssueUrl    string
+	BranchName  string
 }
