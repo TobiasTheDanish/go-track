@@ -419,12 +419,13 @@ func (h *Handler) CreatePRHandler(c echo.Context) error {
 
 	log.Printf("pr: %v\n", pr)
 
-	// item.BranchName = pr.Name
-	//
-	// _, err = h.db.UpdateItem(itemID, item)
-	// if err != nil {
-	// 	return c.String(http.StatusBadRequest, err.Error())
-	// }
+	item.PullRequestID = pr.Id
+	item.PullRequestNumber = pr.Number
+
+	_, err = h.db.UpdateItem(itemID, item)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
 
 	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/%d/columns", id))
 }

@@ -127,6 +127,8 @@ func (db *database) GetItemsForColumn(columnID int) ([]model.Item, error) {
 			&item.IssueNumber,
 			&item.IssueUrl,
 			&item.BranchName,
+			&item.PullRequestID,
+			&item.PullRequestNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -153,14 +155,16 @@ func (db *database) AddItemToColumn(name string, columnID int) (model.Item, erro
 	}
 
 	return model.Item{
-		Id:          int(id),
-		Name:        name,
-		ColumnID:    columnID,
-		ColumnOrder: colOrder,
-		IssueID:     -1,
-		IssueNumber: -1,
-		IssueUrl:    "",
-		BranchName:  "",
+		Id:                int(id),
+		Name:              name,
+		ColumnID:          columnID,
+		ColumnOrder:       colOrder,
+		IssueID:           -1,
+		IssueNumber:       -1,
+		IssueUrl:          "",
+		BranchName:        "",
+		PullRequestID:     -1,
+		PullRequestNumber: -1,
 	}, nil
 }
 
@@ -191,6 +195,8 @@ func (db *database) GetItem(itemID int) (model.Item, error) {
 		&item.IssueNumber,
 		&item.IssueUrl,
 		&item.BranchName,
+		&item.PullRequestID,
+		&item.PullRequestNumber,
 	); err != nil {
 		return model.Item{}, err
 	}
@@ -211,6 +217,8 @@ func (db *database) UpdateItem(id int, itemData model.Item) (model.Item, error) 
 		&item.IssueNumber,
 		&item.IssueUrl,
 		&item.BranchName,
+		&item.PullRequestID,
+		&item.PullRequestNumber,
 	); err != nil {
 		return model.Item{}, err
 	}
