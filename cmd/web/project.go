@@ -147,26 +147,28 @@ func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState
 		break
 	case "in progress":
 		// create branch for issue
-		branches, err := h.gh.GetBranches("TobiasTheDanish", "go-track")
-		if err != nil {
-			return view.ModalState{}, err
-		}
-
-		dropdownItems := make([]view.DropdownItem, len(branches), len(branches))
-
-		for i, branch := range branches {
-			dropdownItems[i] = view.DropdownItem{
-				Value: branch.Commit.Sha,
-				Name:  branch.Name,
+		if item.BranchName == "" {
+			branches, err := h.gh.GetBranches("TobiasTheDanish", "go-track")
+			if err != nil {
+				return view.ModalState{}, err
 			}
-		}
 
-		modalState = view.ModalState{
-			Show:            true,
-			Title:           fmt.Sprintf("Create branch for '%s'", item.Name),
-			Body:            view.CreateBranchModalBody(dropdownItems...),
-			Endpoint:        fmt.Sprintf("/project/%d/items/%d/branch", projID, item.Id),
-			TargetElementID: "columns-container",
+			dropdownItems := make([]view.DropdownItem, len(branches), len(branches))
+
+			for i, branch := range branches {
+				dropdownItems[i] = view.DropdownItem{
+					Value: branch.Commit.Sha,
+					Name:  branch.Name,
+				}
+			}
+
+			modalState = view.ModalState{
+				Show:            true,
+				Title:           fmt.Sprintf("Create branch for '%s'", item.Name),
+				Body:            view.CreateBranchModalBody(dropdownItems...),
+				Endpoint:        fmt.Sprintf("/project/%d/items/%d/branch", projID, item.Id),
+				TargetElementID: "columns-container",
+			}
 		}
 		break
 	case "ready for pull request":
@@ -181,7 +183,7 @@ func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState
 
 			for i, branch := range branches {
 				dropdownItems[i] = view.DropdownItem{
-					Value: branch.Commit.Sha,
+					Value: branch.Name,
 					Name:  branch.Name,
 				}
 			}
