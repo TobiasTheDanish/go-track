@@ -2,34 +2,35 @@ package web
 
 import (
 	"go-track/internal/model"
+	"golang.org/x/exp/rand"
 	"strconv"
 )
 
 type ModalState struct {
 	Show            bool
 	Title           string
-	Body            string
+	Body            templ.Component
 	TargetElementID string
 	Endpoint        string
 }
 
-templ ProjectPage(proj model.Project) {
+templ ProjectPage(proj model.Project, modalState ModalState) {
 	@Base() {
 		<div class="flex flex-col gap-2 h-full pb-1 p-4">
 			<div class="h-1/6">
 				<h1 class="text-3xl font-bold tracking-tight">{ proj.Name }</h1>
 			</div>
-			@ProjectColumns(proj.Columns, ModalState{Show: true, Title: "Hello world", Body: "Lorem ipsum dolor sit amet, qui minim labore adipisicing minim sint cillum sint consectetur cupidatat."})
+			<div id="columns-container" class="flex gap-2 h-5/6 w-full overflow-x-scroll">
+				@ProjectColumns(proj.Columns, modalState)
+			</div>
 		</div>
 	}
 }
 
 templ ProjectColumns(cols []model.Column, modalState ModalState) {
-	<div id="columns-container" class="flex gap-2 h-5/6 w-full overflow-x-scroll">
-		for _, col := range cols {
-			@ProjectColumn(col)
-		}
-	</div>
+	for _, col := range cols {
+		@ProjectColumn(col)
+	}
 	@Modal(modalState)
 }
 
@@ -57,7 +58,6 @@ templ ProjectItem(projID int, item model.Item) {
 			<div
 				hx-post={ "project/" + strconv.Itoa(projID) + "/items/" + strconv.Itoa(item.Id) + "/move?dir=left" }
 				hx-target="#columns-container"
-				hx-swap="outerHTML"
 				class="hover:bg-gray-300 cursor-pointer"
 			>
 				@ArrowLeftIcon()
@@ -65,7 +65,6 @@ templ ProjectItem(projID int, item model.Item) {
 			<div
 				hx-post={ "project/" + strconv.Itoa(projID) + "/items/" + strconv.Itoa(item.Id) + "/move?dir=down" }
 				hx-target="#columns-container"
-				hx-swap="outerHTML"
 				class="hover:bg-gray-300 cursor-pointer"
 			>
 				@ArrowDownIcon()
@@ -73,7 +72,6 @@ templ ProjectItem(projID int, item model.Item) {
 			<div
 				hx-post={ "project/" + strconv.Itoa(projID) + "/items/" + strconv.Itoa(item.Id) + "/move?dir=up" }
 				hx-target="#columns-container"
-				hx-swap="outerHTML"
 				class="hover:bg-gray-300 cursor-pointer"
 			>
 				@ArrowUpIcon()
@@ -81,7 +79,6 @@ templ ProjectItem(projID int, item model.Item) {
 			<div
 				hx-post={ "project/" + strconv.Itoa(projID) + "/items/" + strconv.Itoa(item.Id) + "/move?dir=right" }
 				hx-target="#columns-container"
-				hx-swap="outerHTML"
 				class="hover:bg-gray-300 cursor-pointer"
 			>
 				@ArrowRightIcon()
@@ -95,20 +92,69 @@ templ ProjectItem(projID int, item model.Item) {
 
 templ Modal(state ModalState) {
 	if state.Show {
-		<div id="modal-container">
+		<form
+			hx-post={ state.Endpoint }
+			hx-target={ "#" + state.TargetElementID }
+			id="modal-container"
+		>
 			<div class="absolute top-0 left-0 w-screen h-screen backdrop-opacity-75">
 				<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/2 h-1/2 bg-white shadow opacity-100 flex flex-col gap-4 rounded-lg p-4 border-gray-400">
 					<h1 class="text-2xl font-semibold tracking-tight">{ state.Title }</h1>
-					<p class="text-md flex-1">{ state.Body }</p>
+					<div class="text-md flex-1">
+						@state.Body
+					</div>
 					<div class="flex gap-4 justify-end">
 						<button id="modal-dismiss-btn" type="button">Dismiss</button>
-						<button type="button">Accept</button>
+						<button type="submit">Accept</button>
 					</div>
 				</div>
 			</div>
 			<script src="assets/js/modal.js"></script>
-		</div>
+		</form>
 	}
+}
+
+type DropdownItem struct {
+	Value string
+	Name  string
+}
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+func randSeq(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+templ CreateBranchModalBody(items ...DropdownItem) {
+	<div class="w-full h-full flex flex-col gap-2">
+		<input name="branch-name" placeholder="Input new branch name"/>
+		<h2 class="text-lg font-semibold">Select branch source</h2>
+		@Dropdown(randSeq(12), "branch-sha", items...)
+	</div>
+}
+
+templ Dropdown(id string, inputName string, items ...DropdownItem) {
+	<div id={ id } class="dropdown h-max">
+		<input id={ id + "-input" } name={ inputName } type="hidden"/>
+		<button class="text-start appearance-none w-full p-4 cursor-pointer border border-gray-400 rounded-b-md rounded-t-md shadow bg-white" type="button">
+			<span id={ id + "-selected-value" }>Select item</span>
+		</button>
+		<ul class="hidden border border-gray-400 rounded-b-md shadow bg-white">
+			for _, item := range items {
+				<li
+					class="cursor-pointer px-4 py-2 border-b border-gray-100"
+					data-value={ item.Value }
+					data-for={ id }
+				>
+					{ item.Name }
+				</li>
+			}
+		</ul>
+	</div>
 }
 
 templ CloseIcon() {

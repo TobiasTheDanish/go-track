@@ -38,9 +38,11 @@ func (s *Server) RegisterRoutes() http.Handler {
 	e.GET("/auth/callback", s.webHandler.GithubAuthCallbackHandler)
 
 	e.GET("/:id", s.webHandler.ProjectPageHandler)
+	e.GET("/:id/columns", s.webHandler.ProjectColumnsHandler)
 
 	e.POST("/columns/items", s.webHandler.ProjectItemHandler)
 	e.POST("/project/:id/items/:itemID/move", s.webHandler.MoveProjectItemHandler)
+	e.POST("/project/:id/items/:itemID/branch", s.webHandler.CreateBranchHandler)
 
 	e.DELETE("/columns/:colID/items/:itemID", s.webHandler.DeleteProjectItemHandler)
 
