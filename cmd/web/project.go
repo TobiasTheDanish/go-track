@@ -24,9 +24,29 @@ func (h *Handler) ProjectPageHandler(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
-	log.Printf("%s, %v\n", proj.Name, proj.Columns)
+	modalState := view.ModalState{
+		Show: false,
+	}
 
-	return view.ProjectPage(proj).Render(c.Request().Context(), c.Response().Writer)
+	return view.ProjectPage(proj, modalState).Render(c.Request().Context(), c.Response().Writer)
+}
+
+func (h *Handler) ProjectColumnsHandler(c echo.Context) error {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	cols, err := h.db.GetColumnsForProject(id)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	modalState := view.ModalState{
+		Show: false,
+	}
+
+	return view.ProjectColumns(cols, modalState).Render(c.Request().Context(), c.Response().Writer)
 }
 
 type moveItemRequest struct {
@@ -78,9 +98,10 @@ func (h *Handler) MoveProjectItemHandler(c echo.Context) error {
 		break
 	}
 
+	modalState := view.ModalState{Show: false}
 	if newColId != -1 {
 		item.ColumnID = newColId
-		err = h.itemEnter(newColId, item)
+		modalState, err = h.itemEnter(id, newColId, item)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
@@ -91,24 +112,26 @@ func (h *Handler) MoveProjectItemHandler(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
-	return view.ProjectColumns(cols, view.ModalState{Show: false}).Render(c.Request().Context(), c.Response().Writer)
+	return view.ProjectColumns(cols, modalState).Render(c.Request().Context(), c.Response().Writer)
 }
 
-func (h *Handler) itemEnter(colID int, item model.Item) error {
+func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState, error) {
 	col, err := h.db.GetColumn(colID)
 	if err != nil {
-		return err
+		return view.ModalState{}, err
 	}
 
+	var modalState view.ModalState
 	switch strings.ToLower(col.Name) {
 	case "backlog":
+		modalState = view.ModalState{Show: false}
 		break
 	case "todo":
 		// create new issue
 		if item.IssueID == -1 {
 			issue, err := h.gh.CreateIssue("TobiasTheDanish", "go-track", item.Name)
 			if err != nil {
-				return err
+				return view.ModalState{}, err
 			}
 
 			item.IssueID = issue.Id
@@ -117,22 +140,46 @@ func (h *Handler) itemEnter(colID int, item model.Item) error {
 
 			_, err = h.db.UpdateItem(item.Id, item)
 			if err != nil {
-				return err
+				return view.ModalState{}, err
 			}
 		}
+		modalState = view.ModalState{Show: false}
 		break
 	case "in progress":
 		// create branch for issue
+		branches, err := h.gh.GetBranches("TobiasTheDanish", "go-track")
+		if err != nil {
+			return view.ModalState{}, err
+		}
+
+		dropdownItems := make([]view.DropdownItem, len(branches), len(branches))
+
+		for i, branch := range branches {
+			dropdownItems[i] = view.DropdownItem{
+				Value: branch.Commit.Sha,
+				Name:  branch.Name,
+			}
+		}
+
+		modalState = view.ModalState{
+			Show:            true,
+			Title:           fmt.Sprintf("Create branch for '%s'", item.Name),
+			Body:            view.CreateBranchModalBody(dropdownItems...),
+			Endpoint:        fmt.Sprintf("/project/%d/items/%d/branch", projID, item.Id),
+			TargetElementID: "columns-container",
+		}
 		break
 	case "ready for pull request":
 		// create pr for branch
+		modalState = view.ModalState{Show: false}
 		break
 	case "done":
 		// close pr and issue
+		modalState = view.ModalState{Show: false}
 		break
 	}
 
-	return nil
+	return modalState, nil
 }
 
 func (h *Handler) moveItemDown(item model.Item) error {
@@ -283,6 +330,25 @@ func (h *Handler) ProjectItemHandler(c echo.Context) error {
 	}
 
 	return view.ProjectItem(col.ProjectID, item).Render(c.Request().Context(), c.Response().Writer)
+}
+
+func (h *Handler) CreateBranchHandler(c echo.Context) error {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	name := c.FormValue("branch-name")
+	sha := c.FormValue("branch-sha")
+
+	branch, err := h.gh.CreateBranch("TobiasTheDanish", "go-track", name, sha)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+
+	log.Printf("New branch: %v\n", branch)
+
+	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/%d/columns", id))
 }
 
 func (h *Handler) DeleteProjectItemHandler(c echo.Context) error {

@@ -21,6 +21,10 @@ type GithubService interface {
 	AuthUserByCode(code string) (model.AuthUserRes, error)
 	GetAuthorizedUser(auth model.AuthUserRes) (model.AuthorizedUser, error)
 	CreateIssue(owner string, repo string, title string) (CreateIssueRes, error)
+
+	GetBranches(owner string, repo string) ([]BranchDTO, error)
+	GetBranch(owner string, repo string, name string) (BranchDTO, error)
+	CreateBranch(owner string, repo string, name string, sha string) (BranchDTO, error)
 }
 
 type githubService struct {
