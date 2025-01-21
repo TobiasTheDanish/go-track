@@ -14,11 +14,14 @@ type Column struct {
 }
 
 type Item struct {
-	Id          int
-	Name        string
-	ColumnID    int
-	ColumnOrder int
-	IssueID     int64
-	IssueNumber int
-	IssueUrl    string
+	Id                int
+	Name              string
+	ColumnID          int
+	ColumnOrder       int
+	IssueID           int64
+	IssueNumber       int
+	IssueUrl          string
+	BranchName        string
+	PullRequestID     int
+	PullRequestNumber int
 }

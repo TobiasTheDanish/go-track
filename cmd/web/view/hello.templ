@@ -137,6 +137,14 @@ templ CreateBranchModalBody(items ...DropdownItem) {
 	</div>
 }
 
+templ CreatePRModalBody(head string, items ...DropdownItem) {
+	<div class="w-full h-full flex flex-col gap-2">
+		<input name="head-branch" type="hidden" value={ head }/>
+		<h2 class="text-lg font-semibold">Select branch to merge { head } into</h2>
+		@Dropdown(randSeq(12), "base-branch", items...)
+	</div>
+}
+
 templ Dropdown(id string, inputName string, items ...DropdownItem) {
 	<div id={ id } class="dropdown h-max">
 		<input id={ id + "-input" } name={ inputName } type="hidden"/>

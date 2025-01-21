@@ -126,6 +126,9 @@ func (db *database) GetItemsForColumn(columnID int) ([]model.Item, error) {
 			&item.IssueID,
 			&item.IssueNumber,
 			&item.IssueUrl,
+			&item.BranchName,
+			&item.PullRequestID,
+			&item.PullRequestNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -152,9 +155,16 @@ func (db *database) AddItemToColumn(name string, columnID int) (model.Item, erro
 	}
 
 	return model.Item{
-		Id:       int(id),
-		Name:     name,
-		ColumnID: columnID,
+		Id:                int(id),
+		Name:              name,
+		ColumnID:          columnID,
+		ColumnOrder:       colOrder,
+		IssueID:           -1,
+		IssueNumber:       -1,
+		IssueUrl:          "",
+		BranchName:        "",
+		PullRequestID:     -1,
+		PullRequestNumber: -1,
 	}, nil
 }
 
@@ -184,6 +194,9 @@ func (db *database) GetItem(itemID int) (model.Item, error) {
 		&item.IssueID,
 		&item.IssueNumber,
 		&item.IssueUrl,
+		&item.BranchName,
+		&item.PullRequestID,
+		&item.PullRequestNumber,
 	); err != nil {
 		return model.Item{}, err
 	}
@@ -192,7 +205,7 @@ func (db *database) GetItem(itemID int) (model.Item, error) {
 }
 
 func (db *database) UpdateItem(id int, itemData model.Item) (model.Item, error) {
-	res := db.db.QueryRow("UPDATE `gt_project_column_item` SET name=?, column_id=?, column_order=?, gh_issue_no=?, gh_issue_id=?, gh_issue_url=? WHERE id=? RETURNING *", itemData.Name, itemData.ColumnID, itemData.ColumnOrder, itemData.IssueNumber, itemData.IssueID, itemData.IssueUrl, itemData.Id)
+	res := db.db.QueryRow("UPDATE `gt_project_column_item` SET name=?, column_id=?, column_order=?, gh_issue_no=?, gh_issue_id=?, gh_issue_url=?, gh_branch_name=? WHERE id=? RETURNING *", itemData.Name, itemData.ColumnID, itemData.ColumnOrder, itemData.IssueNumber, itemData.IssueID, itemData.IssueUrl, itemData.BranchName, itemData.Id)
 
 	var item model.Item
 	if err := res.Scan(
@@ -203,6 +216,9 @@ func (db *database) UpdateItem(id int, itemData model.Item) (model.Item, error) 
 		&item.IssueID,
 		&item.IssueNumber,
 		&item.IssueUrl,
+		&item.BranchName,
+		&item.PullRequestID,
+		&item.PullRequestNumber,
 	); err != nil {
 		return model.Item{}, err
 	}
