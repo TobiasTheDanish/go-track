@@ -1,6 +1,6 @@
 # Project go-track
 
-A prototype for an external project management tool, integrated directly with GitHub
+A prototype for an external project management tool, integrated directly with GitHub managing issues, branches and pull request automatically.
 
 ## Getting Started
 
