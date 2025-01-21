@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -84,6 +85,7 @@ type mergePullRequestDTO struct {
 }
 
 func (gh *githubService) MergePullRequest(owner string, repo string, title string, message string, pullNumber int) (PullRequestDTO, error) {
+	log.Printf("Merging pull request #%d for repo: %s/%s\n", pullNumber, owner, repo)
 	installation, err := gh.GetUserInstallation(owner)
 	if err != nil {
 		return PullRequestDTO{}, err
@@ -108,7 +110,7 @@ func (gh *githubService) MergePullRequest(owner string, repo string, title strin
 	bodyReader := bytes.NewReader(reqBody)
 
 	reqUrl := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d/merge", owner, repo, pullNumber)
-	req, err := http.NewRequest(http.MethodPost, reqUrl, bodyReader)
+	req, err := http.NewRequest(http.MethodPut, reqUrl, bodyReader)
 	if err != nil {
 		return PullRequestDTO{}, err
 	}

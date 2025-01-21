@@ -205,7 +205,7 @@ func (db *database) GetItem(itemID int) (model.Item, error) {
 }
 
 func (db *database) UpdateItem(id int, itemData model.Item) (model.Item, error) {
-	res := db.db.QueryRow("UPDATE `gt_project_column_item` SET name=?, column_id=?, column_order=?, gh_issue_no=?, gh_issue_id=?, gh_issue_url=?, gh_branch_name=? WHERE id=? RETURNING *", itemData.Name, itemData.ColumnID, itemData.ColumnOrder, itemData.IssueNumber, itemData.IssueID, itemData.IssueUrl, itemData.BranchName, itemData.Id)
+	res := db.db.QueryRow("UPDATE `gt_project_column_item` SET name=?, column_id=?, column_order=?, gh_issue_no=?, gh_issue_id=?, gh_issue_url=?, gh_branch_name=?, gh_pr_id=?, gh_pr_no=? WHERE id=? RETURNING *", itemData.Name, itemData.ColumnID, itemData.ColumnOrder, itemData.IssueNumber, itemData.IssueID, itemData.IssueUrl, itemData.BranchName, itemData.PullRequestID, itemData.PullRequestNumber, itemData.Id)
 
 	var item model.Item
 	if err := res.Scan(

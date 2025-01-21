@@ -476,7 +476,10 @@ func (h *Handler) MergePRHandler(c echo.Context) error {
 	}
 
 	if deleteBranch == "on" {
-		h.gh.DeleteBranch("TobiasTheDanish", "go-track", item.BranchName)
+		err = h.gh.DeleteBranch("TobiasTheDanish", "go-track", item.BranchName)
+		if err != nil {
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
 		item.BranchName = ""
 	}
 
