@@ -1,7 +1,6 @@
 package web
 
 import (
-	"errors"
 	"fmt"
 	view "go-track/cmd/web/view"
 	"go-track/internal/model"
@@ -19,7 +18,7 @@ func (h *Handler) ProjectPageHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
 
-	proj, err := h.db.GetProject(id)
+	proj, err := h.projectRepo.GetProject(id)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -37,7 +36,7 @@ func (h *Handler) ProjectColumnsHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
 
-	cols, err := h.db.GetColumnsForProject(id)
+	cols, err := h.columnRepo.GetForProject(id)
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
@@ -47,10 +46,6 @@ func (h *Handler) ProjectColumnsHandler(c echo.Context) error {
 	}
 
 	return view.ProjectColumns(cols, modalState).Render(c.Request().Context(), c.Response().Writer)
-}
-
-type moveItemRequest struct {
-	Direction string `query:"dir"`
 }
 
 func (h *Handler) MoveProjectItemHandler(c echo.Context) error {
@@ -63,51 +58,27 @@ func (h *Handler) MoveProjectItemHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
 
-	dir := c.QueryParam("dir")
-
-	item, err := h.db.GetItem(itemID)
+	oldItem, err := h.itemRepo.Get(itemID)
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
 
-	newColId := -1
-	switch strings.ToLower(dir) {
-	case "left":
-		newColId, err = h.moveItemLeft(id, item)
-		if err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
-		}
-		break
-	case "right":
-		newColId, err = h.moveItemRight(id, item)
-		if err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
-		}
-		break
-	case "up":
-		err = h.moveItemUp(item)
-		if err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
-		}
-		break
-	case "down":
-		err = h.moveItemDown(item)
-		if err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
-		}
-		break
+	dir := c.QueryParam("dir")
+
+	movedItem, err := h.itemRepo.Move(id, itemID, dir)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
 	}
 
 	modalState := view.ModalState{Show: false}
-	if newColId != -1 {
-		item.ColumnID = newColId
-		modalState, err = h.itemEnter(id, newColId, item)
+	if movedItem.ColumnID != oldItem.ColumnID {
+		modalState, err = h.itemEnter(id, movedItem.ColumnID, movedItem)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
 	}
 
-	cols, err := h.db.GetColumnsForProject(id)
+	cols, err := h.columnRepo.GetForProject(id)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -116,7 +87,7 @@ func (h *Handler) MoveProjectItemHandler(c echo.Context) error {
 }
 
 func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState, error) {
-	col, err := h.db.GetColumn(colID)
+	col, err := h.columnRepo.Get(colID)
 	if err != nil {
 		return view.ModalState{}, err
 	}
@@ -129,16 +100,7 @@ func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState
 	case "todo":
 		// create new issue
 		if item.IssueID == -1 {
-			issue, err := h.gh.CreateIssue("TobiasTheDanish", "go-track", item.Name)
-			if err != nil {
-				return view.ModalState{}, err
-			}
-
-			item.IssueID = issue.Id
-			item.IssueNumber = issue.Number
-			item.IssueUrl = issue.HtmlUrl
-
-			_, err = h.db.UpdateItem(item.Id, item)
+			_, err := h.itemRepo.CreateIssue("TobiasTheDanish", "go-track", item)
 			if err != nil {
 				return view.ModalState{}, err
 			}
@@ -148,7 +110,7 @@ func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState
 	case "in progress":
 		// create branch for issue
 		if item.BranchName == "" {
-			branches, err := h.gh.GetBranches("TobiasTheDanish", "go-track")
+			branches, err := h.branchRepo.GetAll("TobiasTheDanish", "go-track")
 			if err != nil {
 				return view.ModalState{}, err
 			}
@@ -157,7 +119,7 @@ func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState
 
 			for i, branch := range branches {
 				dropdownItems[i] = view.DropdownItem{
-					Value: branch.Commit.Sha,
+					Value: branch.Sha,
 					Name:  branch.Name,
 				}
 			}
@@ -176,7 +138,7 @@ func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState
 	case "ready for pull request":
 		// create pr for branch
 		if item.BranchName != "" {
-			branches, err := h.gh.GetBranches("TobiasTheDanish", "go-track")
+			branches, err := h.branchRepo.GetAll("TobiasTheDanish", "go-track")
 			if err != nil {
 				return view.ModalState{}, err
 			}
@@ -223,132 +185,6 @@ func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState
 	return modalState, nil
 }
 
-func (h *Handler) moveItemDown(item model.Item) error {
-	col, err := h.db.GetColumn(item.ColumnID)
-	if err != nil {
-		return err
-	}
-
-	itemToSwap := model.Item{ColumnOrder: -1}
-	for _, i := range col.Items {
-		if i.ColumnOrder > item.ColumnOrder {
-			if itemToSwap.ColumnOrder == -1 || i.ColumnOrder < itemToSwap.ColumnOrder {
-				itemToSwap = i
-			}
-		}
-	}
-
-	temp := item.ColumnOrder
-	item.ColumnOrder = itemToSwap.ColumnOrder
-	itemToSwap.ColumnOrder = temp
-
-	_, err = h.db.UpdateItem(item.Id, item)
-	if err != nil {
-		return err
-	}
-	_, err = h.db.UpdateItem(itemToSwap.Id, itemToSwap)
-	return err
-}
-
-func (h *Handler) moveItemUp(item model.Item) error {
-	col, err := h.db.GetColumn(item.ColumnID)
-	if err != nil {
-		return err
-	}
-
-	itemToSwap := model.Item{ColumnOrder: -1}
-	for _, i := range col.Items {
-		if i.ColumnOrder < item.ColumnOrder {
-			if i.ColumnOrder > itemToSwap.ColumnOrder {
-				itemToSwap = i
-			}
-		}
-	}
-
-	temp := item.ColumnOrder
-	item.ColumnOrder = itemToSwap.ColumnOrder
-	itemToSwap.ColumnOrder = temp
-
-	_, err = h.db.UpdateItem(item.Id, item)
-	if err != nil {
-		return err
-	}
-	_, err = h.db.UpdateItem(itemToSwap.Id, itemToSwap)
-	return err
-}
-
-func (h *Handler) moveItemRight(projID int, item model.Item) (int, error) {
-	proj, err := h.db.GetProject(projID)
-	if err != nil {
-		return -1, err
-	}
-
-	colIndex := len(proj.Columns)
-	for i, col := range proj.Columns {
-		if col.Id == item.ColumnID {
-			colIndex = i
-			break
-		}
-	}
-
-	if colIndex >= len(proj.Columns)+1 {
-		return -1, errors.New("Could not move item right")
-	}
-
-	newCol := proj.Columns[colIndex+1]
-
-	colOrder, err := h.db.GetNextItemColumnOrder(newCol.Id)
-	if err != nil {
-		return -1, err
-	}
-
-	item.ColumnID = newCol.Id
-	item.ColumnOrder = colOrder
-	log.Printf("new item %v\n", item)
-
-	_, err = h.db.UpdateItem(item.Id, item)
-	if err != nil {
-		return -1, err
-	}
-
-	return newCol.Id, nil
-}
-
-func (h *Handler) moveItemLeft(projID int, item model.Item) (int, error) {
-	proj, err := h.db.GetProject(projID)
-	if err != nil {
-		return -1, err
-	}
-
-	colIndex := -1
-	for i, col := range proj.Columns {
-		if col.Id == item.ColumnID {
-			colIndex = i
-			break
-		}
-	}
-
-	if colIndex <= 0 {
-		return -1, errors.New("Could not move item left")
-	}
-
-	newCol := proj.Columns[colIndex-1]
-
-	colOrder, err := h.db.GetNextItemColumnOrder(newCol.Id)
-	if err != nil {
-		return -1, err
-	}
-
-	item.ColumnID = newCol.Id
-	item.ColumnOrder = colOrder
-
-	_, err = h.db.UpdateItem(item.Id, item)
-	if err != nil {
-		return -1, err
-	}
-	return newCol.Id, err
-}
-
 func (h *Handler) ProjectItemHandler(c echo.Context) error {
 	name := c.FormValue("name")
 	if len(name) == 0 {
@@ -360,12 +196,12 @@ func (h *Handler) ProjectItemHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
 
-	item, err := h.db.AddItemToColumn(name, columnID)
+	item, err := h.columnRepo.AddItem(name, columnID)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
-	col, err := h.db.GetColumn(columnID)
+	col, err := h.columnRepo.Get(columnID)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -384,22 +220,10 @@ func (h *Handler) CreateBranchHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
 
-	item, err := h.db.GetItem(itemID)
-	if err != nil {
-		return c.String(http.StatusBadRequest, err.Error())
-	}
-
 	name := c.FormValue("branch-name")
 	sha := c.FormValue("branch-sha")
 
-	branch, err := h.gh.CreateBranch("TobiasTheDanish", "go-track", name, sha)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
-	}
-
-	item.BranchName = branch.Name
-
-	_, err = h.db.UpdateItem(itemID, item)
+	_, err = h.itemRepo.CreateBranch("TobiasTheDanish", "go-track", name, sha, itemID)
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
@@ -418,26 +242,10 @@ func (h *Handler) CreatePRHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
 
-	item, err := h.db.GetItem(itemID)
-	if err != nil {
-		return c.String(http.StatusBadRequest, err.Error())
-	}
-
 	head := c.FormValue("head-branch")
 	base := c.FormValue("base-branch")
 
-	pr, err := h.gh.CreatePullRequest("TobiasTheDanish", "go-track", head, base, item.IssueNumber)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
-	}
-
-	item.IssueID = -1
-	item.IssueNumber = -1
-	item.IssueUrl = ""
-	item.PullRequestID = pr.Id
-	item.PullRequestNumber = pr.Number
-
-	_, err = h.db.UpdateItem(itemID, item)
+	_, err = h.itemRepo.CreatePullRequest("TobiasTheDanish", "go-track", head, base, itemID)
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
@@ -456,11 +264,6 @@ func (h *Handler) MergePRHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
 
-	item, err := h.db.GetItem(itemID)
-	if err != nil {
-		return c.String(http.StatusBadRequest, err.Error())
-	}
-
 	pullNumber, err := strconv.Atoi(c.FormValue("pull-number"))
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
@@ -470,23 +273,7 @@ func (h *Handler) MergePRHandler(c echo.Context) error {
 	message := c.FormValue("commit-message")
 	deleteBranch := c.FormValue("delete-branch")
 
-	_, err = h.gh.MergePullRequest("TobiasTheDanish", "go-track", title, message, pullNumber)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
-	}
-
-	if deleteBranch == "on" {
-		err = h.gh.DeleteBranch("TobiasTheDanish", "go-track", item.BranchName)
-		if err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
-		}
-		item.BranchName = ""
-	}
-
-	item.PullRequestID = -1
-	item.PullRequestNumber = -1
-
-	_, err = h.db.UpdateItem(itemID, item)
+	_, err = h.itemRepo.MergePullRequest("TobiasTheDanish", "go-track", title, message, pullNumber, deleteBranch == "on", itemID)
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
@@ -506,12 +293,7 @@ func (h *Handler) DeleteProjectItemHandler(c echo.Context) error {
 
 	log.Printf("ColumnID: %d, ItemID: %d\n", columnID, itemID)
 
-	err = h.db.DeleteItem(itemID)
-	if err != nil {
-		return c.String(http.StatusBadRequest, fmt.Sprintf("Could not delete item: %s", err.Error()))
-	}
-
-	column, err := h.db.GetColumn(columnID)
+	column, err := h.columnRepo.RemoveItem(itemID, columnID)
 	if err != nil {
 		return c.String(http.StatusBadRequest, fmt.Sprintf("Could not delete item: %s", err.Error()))
 	}
