@@ -150,6 +150,10 @@ templ MergePRModalBody(title, message string, pullNumber int) {
 		<input name="pull-number" type="hidden" value={ strconv.Itoa(pullNumber) }/>
 		<input name="commit-title" placeholder="Enter commit title" value={ title }/>
 		<input name="commit-message" placeholder="Enter commit message" value={ message }/>
+		<div>
+			<input id="delete-branch" name="delete-branch" type="checkbox" checked/>
+			<label for="delete-branch">Delete branch after merge</label>
+		</div>
 	</div>
 }
 

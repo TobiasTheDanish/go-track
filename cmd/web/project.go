@@ -431,6 +431,9 @@ func (h *Handler) CreatePRHandler(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
+	item.IssueID = -1
+	item.IssueNumber = -1
+	item.IssueUrl = ""
 	item.PullRequestID = pr.Id
 	item.PullRequestNumber = pr.Number
 
@@ -465,16 +468,18 @@ func (h *Handler) MergePRHandler(c echo.Context) error {
 
 	title := c.FormValue("commit-title")
 	message := c.FormValue("commit-message")
+	deleteBranch := c.FormValue("delete-branch")
 
 	_, err = h.gh.MergePullRequest("TobiasTheDanish", "go-track", title, message, pullNumber)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
-	item.IssueID = -1
-	item.IssueNumber = -1
-	item.IssueUrl = ""
-	item.BranchName = ""
+	if deleteBranch == "on" {
+		h.gh.DeleteBranch("TobiasTheDanish", "go-track", item.BranchName)
+		item.BranchName = ""
+	}
+
 	item.PullRequestID = -1
 	item.PullRequestNumber = -1
 

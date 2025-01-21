@@ -25,6 +25,7 @@ type GithubService interface {
 	GetBranches(owner string, repo string) ([]BranchDTO, error)
 	GetBranch(owner string, repo string, name string) (BranchDTO, error)
 	CreateBranch(owner string, repo string, name string, sha string) (BranchDTO, error)
+	DeleteBranch(owner string, repo string, name string) error
 
 	CreatePullRequest(owner string, repo string, head string, base string, issueNumber int) (PullRequestDTO, error)
 	MergePullRequest(owner string, repo string, title string, message string, pullNumber int) (PullRequestDTO, error)
