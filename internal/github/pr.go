@@ -16,10 +16,15 @@ type PullRequestDTO struct {
 	Url    string `json:"html_url"`
 }
 
-type createPullRequestDTO struct {
+type createPullRequestFromIssueDTO struct {
 	Head  string `json:"head"`
 	Base  string `json:"base"`
 	Issue int    `json:"issue"`
+}
+type createPullRequestDTO struct {
+	Head  string `json:"head"`
+	Base  string `json:"base"`
+	Title string `json:"title"`
 }
 
 func (gh *githubService) CreatePullRequest(owner string, repo string, head string, base string, issueNumber int) (PullRequestDTO, error) {
@@ -33,13 +38,22 @@ func (gh *githubService) CreatePullRequest(owner string, repo string, head strin
 		return PullRequestDTO{}, err
 	}
 
-	pr := createPullRequestDTO{
-		Head:  head,
-		Base:  base,
-		Issue: issueNumber,
+	var reqBody []byte
+	if issueNumber == -1 {
+		pr := createPullRequestDTO{
+			Head:  head,
+			Base:  base,
+			Title: head,
+		}
+		reqBody, err = json.Marshal(pr)
+	} else {
+		pr := createPullRequestFromIssueDTO{
+			Head:  head,
+			Base:  base,
+			Issue: issueNumber,
+		}
+		reqBody, err = json.Marshal(pr)
 	}
-
-	reqBody, err := json.Marshal(pr)
 	if err != nil {
 		return PullRequestDTO{}, err
 	}
