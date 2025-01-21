@@ -27,6 +27,7 @@ type GithubService interface {
 	CreateBranch(owner string, repo string, name string, sha string) (BranchDTO, error)
 
 	CreatePullRequest(owner string, repo string, head string, base string, issueNumber int) (PullRequestDTO, error)
+	MergePullRequest(owner string, repo string, title string, message string, pullNumber int) (PullRequestDTO, error)
 }
 
 type githubService struct {

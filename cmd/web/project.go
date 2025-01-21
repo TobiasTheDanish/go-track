@@ -169,6 +169,8 @@ func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState
 				Endpoint:        fmt.Sprintf("/project/%d/items/%d/branch", projID, item.Id),
 				TargetElementID: "columns-container",
 			}
+		} else {
+			modalState = view.ModalState{Show: false}
 		}
 		break
 	case "ready for pull request":
@@ -202,7 +204,19 @@ func (h *Handler) itemEnter(projID, colID int, item model.Item) (view.ModalState
 		break
 	case "done":
 		// close pr and issue
-		modalState = view.ModalState{Show: false}
+		if item.PullRequestNumber != -1 {
+			title := fmt.Sprintf("Merge pull request #%d from TobiasTheDanish/%s", item.PullRequestNumber, item.BranchName)
+
+			modalState = view.ModalState{
+				Show:            true,
+				Title:           fmt.Sprintf("Merge pull request for branch '%s'", item.BranchName),
+				Body:            view.MergePRModalBody(title, item.BranchName, item.PullRequestNumber),
+				Endpoint:        fmt.Sprintf("/project/%d/items/%d/merge", projID, item.Id),
+				TargetElementID: "columns-container",
+			}
+		} else {
+			modalState = view.ModalState{Show: false}
+		}
 		break
 	}
 
@@ -417,10 +431,52 @@ func (h *Handler) CreatePRHandler(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
-	log.Printf("pr: %v\n", pr)
-
 	item.PullRequestID = pr.Id
 	item.PullRequestNumber = pr.Number
+
+	_, err = h.db.UpdateItem(itemID, item)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	return c.Redirect(http.StatusSeeOther, fmt.Sprintf("/%d/columns", id))
+}
+
+func (h *Handler) MergePRHandler(c echo.Context) error {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	itemID, err := strconv.Atoi(c.Param("itemID"))
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	item, err := h.db.GetItem(itemID)
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	pullNumber, err := strconv.Atoi(c.FormValue("pull-number"))
+	if err != nil {
+		return c.String(http.StatusBadRequest, err.Error())
+	}
+
+	title := c.FormValue("commit-title")
+	message := c.FormValue("commit-message")
+
+	_, err = h.gh.MergePullRequest("TobiasTheDanish", "go-track", title, message, pullNumber)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+
+	item.IssueID = -1
+	item.IssueNumber = -1
+	item.IssueUrl = ""
+	item.BranchName = ""
+	item.PullRequestID = -1
+	item.PullRequestNumber = -1
 
 	_, err = h.db.UpdateItem(itemID, item)
 	if err != nil {
