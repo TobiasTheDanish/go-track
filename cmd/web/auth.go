@@ -3,7 +3,6 @@ package web
 import (
 	view "go-track/cmd/web/view"
 	"go-track/internal/auth"
-	"log"
 	"net/http"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 )
 
 func (h *Handler) SignInHandler(c echo.Context) error {
-	authUrl := h.gh.GetAuthUrl()
+	authUrl := h.authRepo.GetAuthUrl()
 
 	return view.SignIn(templ.SafeURL(authUrl)).Render(c.Request().Context(), c.Response().Writer)
 }
@@ -20,21 +19,10 @@ func (h *Handler) SignInHandler(c echo.Context) error {
 func (h *Handler) GithubAuthCallbackHandler(c echo.Context) error {
 	code := c.QueryParam("code")
 
-	log.Printf("Github oAuth code: %v\n", code)
-
-	authUser, err := h.gh.AuthUserByCode(code)
+	user, err := h.authRepo.AuthorizeUser(code)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err)
 	}
-
-	log.Printf("AuthUserRes: %v\n", authUser)
-
-	user, err := h.gh.GetAuthorizedUser(authUser)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err)
-	}
-
-	log.Printf("AuthorizedUser: %v\n", user)
 
 	jwtString, err := auth.SignAuthSession(auth.AuthSession{
 		Username: user.Username,

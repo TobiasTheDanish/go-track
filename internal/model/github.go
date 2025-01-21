@@ -13,3 +13,8 @@ type AuthorizedUser struct {
 	Username string `json:"login"`
 	OrgUrl   string `json:"organizations_url"`
 }
+
+type Branch struct {
+	Name string
+	Sha  string
+}

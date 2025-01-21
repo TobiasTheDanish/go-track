@@ -1,16 +1,15 @@
 package repo
 
 import (
-	"fmt"
 	"go-track/internal/db"
 	"go-track/internal/model"
-	"strings"
 )
 
 type ColumnRepository interface {
-	GetColumnsForProject(projectID int) ([]model.Column, error)
-	GetColumn(id int) (model.Column, error)
-	AddItemToColumn(name string, columnID int) (model.Item, error)
+	GetForProject(projectID int) ([]model.Column, error)
+	Get(id int) (model.Column, error)
+	AddItem(name string, columnID int) (model.Item, error)
+	RemoveItem(itemID, columnID int) (model.Column, error)
 }
 
 type columnRepo struct {
@@ -23,14 +22,23 @@ func NewColumnRepo(db db.DatabaseFacade) ColumnRepository {
 	}
 }
 
-func (r *columnRepo) GetColumnsForProject(projectID int) ([]model.Column, error) {
+func (r *columnRepo) GetForProject(projectID int) ([]model.Column, error) {
 	return r.db.GetColumnsForProject(projectID)
 }
 
-func (r *columnRepo) GetColumn(id int) (model.Column, error) {
+func (r *columnRepo) Get(id int) (model.Column, error) {
 	return r.db.GetColumn(id)
 }
 
-func (r *columnRepo) AddItemToColumn(name string, columnID int) (model.Item, error) {
+func (r *columnRepo) AddItem(name string, columnID int) (model.Item, error) {
 	return r.db.AddItemToColumn(name, columnID)
+}
+
+func (r *columnRepo) RemoveItem(itemID, columnID int) (model.Column, error) {
+	err := r.db.DeleteItem(itemID)
+	if err != nil {
+		return model.Column{}, err
+	}
+
+	return r.db.GetColumn(columnID)
 }

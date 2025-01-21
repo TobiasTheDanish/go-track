@@ -2,8 +2,6 @@ package repo
 
 import (
 	"errors"
-	"fmt"
-	view "go-track/cmd/web/view"
 	"go-track/internal/db"
 	"go-track/internal/github"
 	"go-track/internal/model"
@@ -14,6 +12,9 @@ type ItemRepository interface {
 	Move(projID, itemID int, dir string) (model.Item, error)
 	Get(itemID int) (model.Item, error)
 	CreateIssue(owner, repo string, item model.Item) (model.Item, error)
+	CreateBranch(owner, repo, branchName, branchSha string, itemID int) (model.Item, error)
+	CreatePullRequest(owner, repo, headBranch, baseBranch string, itemID int) (model.Item, error)
+	MergePullRequest(owner, repo, title, message string, pullNumber int, deleteBranch bool, itemID int) (model.Item, error)
 }
 
 type itemRepo struct {
@@ -45,6 +46,65 @@ func (r *itemRepo) CreateIssue(owner, repo string, item model.Item) (model.Item,
 	return r.db.UpdateItem(item.Id, item)
 }
 
+func (r *itemRepo) CreateBranch(owner, repo, branchName, branchSha string, itemID int) (model.Item, error) {
+
+	item, err := r.Get(itemID)
+	if err != nil {
+		return model.Item{}, err
+	}
+
+	branch, err := r.gh.CreateBranch("TobiasTheDanish", "go-track", branchName, branchSha)
+	if err != nil {
+		return model.Item{}, err
+	}
+
+	item.BranchName = branch.Name
+
+	return r.db.UpdateItem(itemID, item)
+}
+
+func (r *itemRepo) CreatePullRequest(owner, repo, headBranch, baseBranch string, itemID int) (model.Item, error) {
+	item, err := r.Get(itemID)
+	if err != nil {
+		return model.Item{}, err
+	}
+
+	pr, err := r.gh.CreatePullRequest(owner, repo, headBranch, baseBranch, item.IssueNumber)
+	if err != nil {
+		return model.Item{}, err
+	}
+
+	item.IssueID = -1
+	item.IssueNumber = -1
+	item.IssueUrl = ""
+	item.PullRequestID = pr.Id
+	item.PullRequestNumber = pr.Number
+
+	return r.db.UpdateItem(itemID, item)
+}
+
+func (r *itemRepo) MergePullRequest(owner, repo, title, message string, pullNumber int, deleteBranch bool, itemID int) (model.Item, error) {
+	item, err := r.Get(itemID)
+
+	_, err = r.gh.MergePullRequest("TobiasTheDanish", "go-track", title, message, pullNumber)
+	if err != nil {
+		return model.Item{}, err
+	}
+
+	if deleteBranch {
+		err = r.gh.DeleteBranch("TobiasTheDanish", "go-track", item.BranchName)
+		if err != nil {
+			return model.Item{}, err
+		}
+		item.BranchName = ""
+	}
+
+	item.PullRequestID = -1
+	item.PullRequestNumber = -1
+
+	return r.db.UpdateItem(itemID, item)
+}
+
 func (r *itemRepo) Move(projID, itemID int, dir string) (model.Item, error) {
 	item, err := r.db.GetItem(itemID)
 	if err != nil {
@@ -64,114 +124,6 @@ func (r *itemRepo) Move(projID, itemID int, dir string) (model.Item, error) {
 	default:
 		return model.Item{}, errors.New("Invalid move direction")
 	}
-}
-
-func (r *itemRepo) itemEnter(projID, colID int, item model.Item) (view.ModalState, error) {
-	col, err := r.db.GetColumn(colID)
-	if err != nil {
-		return view.ModalState{}, err
-	}
-
-	var modalState view.ModalState
-	switch strings.ToLower(col.Name) {
-	case "backlog":
-		modalState = view.ModalState{Show: false}
-		break
-	case "todo":
-		// create new issue
-		if item.IssueID == -1 {
-			issue, err := r.gh.CreateIssue("TobiasTheDanish", "go-track", item.Name)
-			if err != nil {
-				return view.ModalState{}, err
-			}
-
-			item.IssueID = issue.Id
-			item.IssueNumber = issue.Number
-			item.IssueUrl = issue.HtmlUrl
-
-			_, err = r.db.UpdateItem(item.Id, item)
-			if err != nil {
-				return view.ModalState{}, err
-			}
-		}
-		modalState = view.ModalState{Show: false}
-		break
-	case "in progress":
-		// create branch for issue
-		if item.BranchName == "" {
-			branches, err := r.gh.GetBranches("TobiasTheDanish", "go-track")
-			if err != nil {
-				return view.ModalState{}, err
-			}
-
-			dropdownItems := make([]view.DropdownItem, len(branches), len(branches))
-
-			for i, branch := range branches {
-				dropdownItems[i] = view.DropdownItem{
-					Value: branch.Commit.Sha,
-					Name:  branch.Name,
-				}
-			}
-
-			modalState = view.ModalState{
-				Show:            true,
-				Title:           fmt.Sprintf("Create branch for '%s'", item.Name),
-				Body:            view.CreateBranchModalBody(dropdownItems...),
-				Endpoint:        fmt.Sprintf("/project/%d/items/%d/branch", projID, item.Id),
-				TargetElementID: "columns-container",
-			}
-		} else {
-			modalState = view.ModalState{Show: false}
-		}
-		break
-	case "ready for pull request":
-		// create pr for branch
-		if item.BranchName != "" {
-			branches, err := r.gh.GetBranches("TobiasTheDanish", "go-track")
-			if err != nil {
-				return view.ModalState{}, err
-			}
-
-			dropdownItems := make([]view.DropdownItem, len(branches), len(branches))
-
-			for i, branch := range branches {
-				dropdownItems[i] = view.DropdownItem{
-					Value: branch.Name,
-					Name:  branch.Name,
-				}
-			}
-
-			modalState = view.ModalState{
-				Show:            true,
-				Title:           fmt.Sprintf("Create pull request for branch '%s'", item.BranchName),
-				Body:            view.CreatePRModalBody(item.BranchName, dropdownItems...),
-				Endpoint:        fmt.Sprintf("/project/%d/items/%d/pr", projID, item.Id),
-				TargetElementID: "columns-container",
-			}
-
-		} else {
-			modalState = view.ModalState{Show: false}
-		}
-		break
-	case "done":
-		// close pr and issue
-		if item.PullRequestNumber != -1 {
-			title := fmt.Sprintf("Merge pull request #%d from TobiasTheDanish/%s", item.PullRequestNumber, item.BranchName)
-
-			modalState = view.ModalState{
-				Show:            true,
-				Title:           fmt.Sprintf("Merge pull request for branch '%s'", item.BranchName),
-				Body:            view.MergePRModalBody(title, item.BranchName, item.PullRequestNumber),
-				Endpoint:        fmt.Sprintf("/project/%d/items/%d/merge", projID, item.Id),
-				TargetElementID: "columns-container",
-			}
-		} else {
-			modalState = view.ModalState{Show: false}
-		}
-		break
-	}
-
-	return modalState, nil
 }
 
 func (h *itemRepo) moveItemDown(item model.Item) (model.Item, error) {
