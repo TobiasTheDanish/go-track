@@ -173,7 +173,7 @@ func (gh *githubService) DeleteBranch(owner string, repo string, name string) er
 		return err
 	}
 
-	ref := fmt.Sprintf("refs/heads/%s", name)
+	ref := fmt.Sprintf("heads/%s", name)
 	reqUrl := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/refs/%s", owner, repo, ref)
 	req, err := http.NewRequest(http.MethodDelete, reqUrl, nil)
 	if err != nil {
@@ -193,7 +193,7 @@ func (gh *githubService) DeleteBranch(owner string, repo string, name string) er
 		if err != nil {
 			return err
 		}
-		return errors.New(fmt.Sprintf("Creating branch for repo: '%s/%s', failed with body: %s", owner, repo, resBody))
+		return errors.New(fmt.Sprintf("Deleting branch for repo: '%s/%s', failed with body: %s", owner, repo, resBody))
 	}
 
 	return nil

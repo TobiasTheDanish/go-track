@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -15,10 +16,15 @@ type PullRequestDTO struct {
 	Url    string `json:"html_url"`
 }
 
-type createPullRequestDTO struct {
+type createPullRequestFromIssueDTO struct {
 	Head  string `json:"head"`
 	Base  string `json:"base"`
 	Issue int    `json:"issue"`
+}
+type createPullRequestDTO struct {
+	Head  string `json:"head"`
+	Base  string `json:"base"`
+	Title string `json:"title"`
 }
 
 func (gh *githubService) CreatePullRequest(owner string, repo string, head string, base string, issueNumber int) (PullRequestDTO, error) {
@@ -32,13 +38,22 @@ func (gh *githubService) CreatePullRequest(owner string, repo string, head strin
 		return PullRequestDTO{}, err
 	}
 
-	pr := createPullRequestDTO{
-		Head:  head,
-		Base:  base,
-		Issue: issueNumber,
+	var reqBody []byte
+	if issueNumber == -1 {
+		pr := createPullRequestDTO{
+			Head:  head,
+			Base:  base,
+			Title: head,
+		}
+		reqBody, err = json.Marshal(pr)
+	} else {
+		pr := createPullRequestFromIssueDTO{
+			Head:  head,
+			Base:  base,
+			Issue: issueNumber,
+		}
+		reqBody, err = json.Marshal(pr)
 	}
-
-	reqBody, err := json.Marshal(pr)
 	if err != nil {
 		return PullRequestDTO{}, err
 	}
@@ -84,6 +99,7 @@ type mergePullRequestDTO struct {
 }
 
 func (gh *githubService) MergePullRequest(owner string, repo string, title string, message string, pullNumber int) (PullRequestDTO, error) {
+	log.Printf("Merging pull request #%d for repo: %s/%s\n", pullNumber, owner, repo)
 	installation, err := gh.GetUserInstallation(owner)
 	if err != nil {
 		return PullRequestDTO{}, err
@@ -108,7 +124,7 @@ func (gh *githubService) MergePullRequest(owner string, repo string, title strin
 	bodyReader := bytes.NewReader(reqBody)
 
 	reqUrl := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d/merge", owner, repo, pullNumber)
-	req, err := http.NewRequest(http.MethodPost, reqUrl, bodyReader)
+	req, err := http.NewRequest(http.MethodPut, reqUrl, bodyReader)
 	if err != nil {
 		return PullRequestDTO{}, err
 	}
