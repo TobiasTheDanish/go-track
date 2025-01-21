@@ -161,3 +161,40 @@ func (gh *githubService) CreateBranch(owner, repo, name, fromSha string) (Branch
 		},
 	}, nil
 }
+
+func (gh *githubService) DeleteBranch(owner string, repo string, name string) error {
+	installation, err := gh.GetUserInstallation(owner)
+	if err != nil {
+		return err
+	}
+
+	access, err := gh.GetInstallationAccessToken(installation)
+	if err != nil {
+		return err
+	}
+
+	ref := fmt.Sprintf("refs/heads/%s", name)
+	reqUrl := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/refs/%s", owner, repo, ref)
+	req, err := http.NewRequest(http.MethodDelete, reqUrl, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", access.Token))
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode != 204 {
+		resBody, err := io.ReadAll(res.Body)
+		if err != nil {
+			return err
+		}
+		return errors.New(fmt.Sprintf("Creating branch for repo: '%s/%s', failed with body: %s", owner, repo, resBody))
+	}
+
+	return nil
+}

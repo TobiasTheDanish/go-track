@@ -145,6 +145,18 @@ templ CreatePRModalBody(head string, items ...DropdownItem) {
 	</div>
 }
 
+templ MergePRModalBody(title, message string, pullNumber int) {
+	<div class="w-full h-full flex flex-col gap-2">
+		<input name="pull-number" type="hidden" value={ strconv.Itoa(pullNumber) }/>
+		<input name="commit-title" placeholder="Enter commit title" value={ title }/>
+		<input name="commit-message" placeholder="Enter commit message" value={ message }/>
+		<div>
+			<input id="delete-branch" name="delete-branch" type="checkbox" checked/>
+			<label for="delete-branch">Delete branch after merge</label>
+		</div>
+	</div>
+}
+
 templ Dropdown(id string, inputName string, items ...DropdownItem) {
 	<div id={ id } class="dropdown h-max">
 		<input id={ id + "-input" } name={ inputName } type="hidden"/>

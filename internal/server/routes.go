@@ -44,6 +44,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	e.POST("/project/:id/items/:itemID/move", s.webHandler.MoveProjectItemHandler)
 	e.POST("/project/:id/items/:itemID/branch", s.webHandler.CreateBranchHandler)
 	e.POST("/project/:id/items/:itemID/pr", s.webHandler.CreatePRHandler)
+	e.POST("/project/:id/items/:itemID/merge", s.webHandler.MergePRHandler)
 
 	e.DELETE("/columns/:colID/items/:itemID", s.webHandler.DeleteProjectItemHandler)
 
