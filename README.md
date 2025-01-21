@@ -1,5 +1,6 @@
 # Project go-track
 
+A prototype for an external project management tool, integrated directly with GitHub
 
 ## Getting Started
 
